@@ -1,0 +1,188 @@
+{
+    "name": "pl_ingest_entity",
+    "properties": {
+        "description": "Check, copy and verify one entity",
+        "activities": [
+            {
+                "name": "Check_Source_File",
+                "type": "GetMetadata",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                    "dataset": {
+                        "referenceName": "ds_source_csv",
+                        "type": "DatasetReference",
+                        "parameters": {
+                            "fileName": {
+                                "value": "@pipeline().parameters.fileName",
+                                "type": "Expression"
+                            }
+                        }
+                    },
+                    "fieldList": [
+                        "exists"
+                    ],
+                    "storeSettings": {
+                        "type": "AzureBlobFSReadSettings"
+                    },
+                    "formatSettings": {
+                        "type": "DelimitedTextReadSettings"
+                    }
+                },
+                "policy": {
+                    "timeout": "0.01:00:00",
+                    "retry": 2,
+                    "retryIntervalInSeconds": 30
+                }
+            },
+            {
+                "name": "If_Source_Missing",
+                "type": "IfCondition",
+                "dependsOn": [
+                    {
+                        "activity": "Check_Source_File",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                    "expression": {
+                        "value": "@activity('Check_Source_File').output.exists",
+                        "type": "Expression"
+                    },
+                    "ifFalseActivities": [
+                        {
+                            "name": "Fail_Missing_File",
+                            "type": "Fail",
+                            "dependsOn": [],
+                            "userProperties": [],
+                            "typeProperties": {
+                                "errorCode": "SOURCE_FILE_MISSING",
+                                "message": {
+                                    "value": "@concat('Source file not found: ', pipeline().parameters.fileName)",
+                                    "type": "Expression"
+                                }
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                "name": "Copy_CSV_To_Bronze",
+                "type": "Copy",
+                "dependsOn": [
+                    {
+                        "activity": "If_Source_Missing",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                    "source": {
+                        "type": "DelimitedTextSource",
+                        "storeSettings": {
+                            "type": "AzureBlobFSReadSettings",
+                            "recursive": false
+                        },
+                        "formatSettings": {
+                            "type": "DelimitedTextReadSettings"
+                        }
+                    },
+                    "sink": {
+                        "type": "ParquetSink",
+                        "storeSettings": {
+                            "type": "AzureBlobFSWriteSettings"
+                        },
+                        "formatSettings": {
+                            "type": "ParquetWriteSettings"
+                        }
+                    },
+                    "enableStaging": false
+                },
+                "policy": {
+                    "timeout": "0.01:00:00",
+                    "retry": 2,
+                    "retryIntervalInSeconds": 30
+                },
+                "inputs": [
+                    {
+                        "referenceName": "ds_source_csv",
+                        "type": "DatasetReference",
+                        "parameters": {
+                            "fileName": {
+                                "value": "@pipeline().parameters.fileName",
+                                "type": "Expression"
+                            }
+                        }
+                    }
+                ],
+                "outputs": [
+                    {
+                        "referenceName": "ds_bronze_parquet",
+                        "type": "DatasetReference",
+                        "parameters": {
+                            "folderPath": {
+                                "value": "@concat(pipeline().parameters.entity, '/load_date=', pipeline().parameters.runDate)",
+                                "type": "Expression"
+                            },
+                            "fileName": {
+                                "value": "@concat(pipeline().parameters.entity, '.parquet')",
+                                "type": "Expression"
+                            }
+                        }
+                    }
+                ]
+            },
+            {
+                "name": "If_Row_Check_Fails",
+                "type": "IfCondition",
+                "dependsOn": [
+                    {
+                        "activity": "Copy_CSV_To_Bronze",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                    "expression": {
+                        "value": "@or(equals(activity('Copy_CSV_To_Bronze').output.rowsRead, 0), not(equals(activity('Copy_CSV_To_Bronze').output.rowsRead, activity('Copy_CSV_To_Bronze').output.rowsCopied)))",
+                        "type": "Expression"
+                    },
+                    "ifTrueActivities": [
+                        {
+                            "name": "Fail_Row_Check",
+                            "type": "Fail",
+                            "dependsOn": [],
+                            "userProperties": [],
+                            "typeProperties": {
+                                "errorCode": "ROW_COUNT_CHECK_FAILED",
+                                "message": {
+                                    "value": "@concat('Row count check failed for ', pipeline().parameters.entity)",
+                                    "type": "Expression"
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        ],
+        "parameters": {
+            "entity": {
+                "type": "string"
+            },
+            "fileName": {
+                "type": "string"
+            },
+            "runDate": {
+                "type": "string"
+            }
+        },
+        "annotations": []
+    }
+}

@@ -1,0 +1,22 @@
+[
+  {
+    "entity": "customers",
+    "fileName": "customers.csv",
+    "enabled": true
+  },
+  {
+    "entity": "products",
+    "fileName": "products.csv",
+    "enabled": true
+  },
+  {
+    "entity": "orders",
+    "fileName": "orders.csv",
+    "enabled": true
+  },
+  {
+    "entity": "returns",
+    "fileName": "returns.csv",
+    "enabled": false
+  }
+]

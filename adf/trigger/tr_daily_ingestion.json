@@ -1,0 +1,28 @@
+{
+    "name": "tr_daily_ingestion",
+    "properties": {
+        "description": "Daily 06:00 IST. Kept stopped to avoid unplanned cost.",
+        "runtimeState": "Stopped",
+        "type": "ScheduleTrigger",
+        "annotations": [],
+        "typeProperties": {
+            "recurrence": {
+                "frequency": "Day",
+                "interval": 1,
+                "startTime": "2026-12-01T06:00:00",
+                "timeZone": "India Standard Time"
+            }
+        },
+        "pipelines": [
+            {
+                "pipelineReference": {
+                    "referenceName": "pl_master_ingestion",
+                    "type": "PipelineReference"
+                },
+                "parameters": {
+                    "runDate": ""
+                }
+            }
+        ]
+    }
+}

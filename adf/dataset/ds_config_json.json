@@ -1,0 +1,19 @@
+{
+    "name": "ds_config_json",
+    "properties": {
+        "linkedServiceName": {
+            "referenceName": "ls_adls",
+            "type": "LinkedServiceReference"
+        },
+        "type": "Json",
+        "typeProperties": {
+            "location": {
+                "type": "AzureBlobFSLocation",
+                "fileSystem": "config",
+                "fileName": "ingestion_config.json"
+            }
+        },
+        "annotations": [],
+        "schema": {}
+    }
+}

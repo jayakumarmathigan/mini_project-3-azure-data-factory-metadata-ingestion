@@ -1,0 +1,116 @@
+{
+    "name": "pl_master_ingestion",
+    "properties": {
+        "description": "Reads the control file and loads each enabled entity",
+        "activities": [
+            {
+                "name": "Lookup_Config",
+                "type": "Lookup",
+                "dependsOn": [],
+                "userProperties": [],
+                "typeProperties": {
+                    "source": {
+                        "type": "JsonSource",
+                        "storeSettings": {
+                            "type": "AzureBlobFSReadSettings",
+                            "recursive": false
+                        },
+                        "formatSettings": {
+                            "type": "JsonReadSettings"
+                        }
+                    },
+                    "dataset": {
+                        "referenceName": "ds_config_json",
+                        "type": "DatasetReference"
+                    },
+                    "firstRowOnly": false
+                },
+                "policy": {
+                    "timeout": "0.01:00:00",
+                    "retry": 2,
+                    "retryIntervalInSeconds": 30
+                }
+            },
+            {
+                "name": "Filter_Enabled",
+                "type": "Filter",
+                "dependsOn": [
+                    {
+                        "activity": "Lookup_Config",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                    "items": {
+                        "value": "@activity('Lookup_Config').output.value",
+                        "type": "Expression"
+                    },
+                    "condition": {
+                        "value": "@equals(item().enabled, true)",
+                        "type": "Expression"
+                    }
+                }
+            },
+            {
+                "name": "ForEach_Entity",
+                "type": "ForEach",
+                "dependsOn": [
+                    {
+                        "activity": "Filter_Enabled",
+                        "dependencyConditions": [
+                            "Succeeded"
+                        ]
+                    }
+                ],
+                "userProperties": [],
+                "typeProperties": {
+                    "items": {
+                        "value": "@activity('Filter_Enabled').output.value",
+                        "type": "Expression"
+                    },
+                    "isSequential": false,
+                    "batchCount": 3,
+                    "activities": [
+                        {
+                            "name": "Run_Ingest_Entity",
+                            "type": "ExecutePipeline",
+                            "dependsOn": [],
+                            "userProperties": [],
+                            "typeProperties": {
+                                "pipeline": {
+                                    "referenceName": "pl_ingest_entity",
+                                    "type": "PipelineReference"
+                                },
+                                "waitOnCompletion": true,
+                                "parameters": {
+                                    "entity": {
+                                        "value": "@item().entity",
+                                        "type": "Expression"
+                                    },
+                                    "fileName": {
+                                        "value": "@item().fileName",
+                                        "type": "Expression"
+                                    },
+                                    "runDate": {
+                                        "value": "@if(empty(pipeline().parameters.runDate), formatDateTime(pipeline().TriggerTime, 'yyyy-MM-dd'), pipeline().parameters.runDate)",
+                                        "type": "Expression"
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        ],
+        "parameters": {
+            "runDate": {
+                "type": "string",
+                "defaultValue": ""
+            }
+        },
+        "annotations": []
+    }
+}
